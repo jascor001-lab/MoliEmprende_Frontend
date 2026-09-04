@@ -1,8 +1,17 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import type { PanelRole, PublicPanelUser } from "@/lib/admin/types";
+import { findUserById } from "@/lib/admin/users";
 
 const COOKIE_NAME = "moliemprende_admin";
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export interface SessionPayload {
+  userId: string;
+  role: PanelRole;
+  username: string;
+  exp: number;
+}
 
 function getSecret(): string {
   return (
@@ -12,52 +21,86 @@ function getSecret(): string {
   );
 }
 
-export function getAdminCredentials() {
-  return {
-    username: process.env.ADMIN_USERNAME || "admin",
-    password: process.env.ADMIN_PASSWORD || "admin123",
-  };
-}
-
 function sign(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
 
-export function createAdminToken(): string {
+export function createSessionToken(user: {
+  id: string;
+  role: PanelRole;
+  username: string;
+}): string {
   const exp = Date.now() + MAX_AGE_MS;
-  const payload = `admin:${exp}`;
-  return `${exp}.${sign(payload)}`;
+  const body = `${user.id}|${user.role}|${user.username}|${exp}`;
+  return `${body}.${sign(body)}`;
 }
 
-export function verifyAdminToken(token: string | undefined): boolean {
-  if (!token) return false;
-  const [expStr, sig] = token.split(".");
-  if (!expStr || !sig) return false;
-  const exp = Number(expStr);
-  if (!Number.isFinite(exp) || Date.now() > exp) return false;
+export function parseSessionToken(
+  token: string | undefined
+): SessionPayload | null {
+  if (!token) return null;
+  const lastDot = token.lastIndexOf(".");
+  if (lastDot <= 0) return null;
 
-  const expected = sign(`admin:${exp}`);
+  const body = token.slice(0, lastDot);
+  const sig = token.slice(lastDot + 1);
+  const expected = sign(body);
+
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   } catch {
-    return false;
+    return null;
   }
+
+  const [userId, role, username, expStr] = body.split("|");
+  const exp = Number(expStr);
+  if (!userId || !username || (role !== "admin" && role !== "user")) return null;
+  if (!Number.isFinite(exp) || Date.now() > exp) return null;
+
+  return { userId, role, username, exp };
 }
 
-export function validateAdminCredentials(
-  username: string,
-  password: string
-): boolean {
-  const creds = getAdminCredentials();
-  return username === creds.username && password === creds.password;
-}
-
-export async function isAdminAuthenticated(): Promise<boolean> {
+export async function getSession(): Promise<SessionPayload | null> {
   const jar = cookies();
-  return verifyAdminToken(jar.get(COOKIE_NAME)?.value);
+  return parseSessionToken(jar.get(COOKIE_NAME)?.value);
+}
+
+export async function requireAuth(): Promise<SessionPayload | null> {
+  const session = await getSession();
+  if (!session) return null;
+
+  const user = await findUserById(session.userId);
+  if (!user || !user.active) return null;
+  if (user.role !== session.role) return null;
+
+  return {
+    userId: user.id,
+    role: user.role,
+    username: user.username,
+    exp: session.exp,
+  };
+}
+
+export async function requireAdmin(): Promise<SessionPayload | null> {
+  const session = await requireAuth();
+  if (!session || session.role !== "admin") return null;
+  return session;
+}
+
+/** @deprecated usar requireAuth */
+export async function isAdminAuthenticated(): Promise<boolean> {
+  return Boolean(await requireAuth());
+}
+
+export async function getCurrentPublicUser(): Promise<PublicPanelUser | null> {
+  const session = await requireAuth();
+  if (!session) return null;
+  const user = await findUserById(session.userId);
+  if (!user || !user.active) return null;
+  const { passwordHash: _, ...pub } = user;
+  return pub;
 }
 
 export { COOKIE_NAME, MAX_AGE_MS };

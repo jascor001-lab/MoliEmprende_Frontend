@@ -43,8 +43,10 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
           <Shield className="h-6 w-6 text-molina" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-molina-dark">Acceso administrador</h1>
-          <p className="text-sm text-slate-600">MoliEmprende — Municipalidad de La Molina</p>
+          <h1 className="text-xl font-bold text-molina-dark">Acceso al panel</h1>
+          <p className="text-sm text-slate-600">
+            Administradores y usuarios de consulta — MoliEmprende
+          </p>
         </div>
       </div>
 

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/admin/auth";
+import { requireAuth } from "@/lib/admin/auth";
 import { readRegistrations } from "@/lib/registrations/store";
 import { mergeRegistrationsByDni } from "@/lib/registrations/serialize";
 
 export async function GET() {
-  if (!(await isAdminAuthenticated())) {
+  if (!(await requireAuth())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
