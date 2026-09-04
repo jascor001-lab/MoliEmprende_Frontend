@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send } from "lucide-react";
 import { ProgressBar } from "@/components/form/ProgressBar";
 import { NotResidentScreen } from "@/components/form/NotResidentScreen";
 import { SuccessScreen } from "@/components/form/SuccessScreen";
@@ -293,8 +293,21 @@ export function MoliEmprendeWizard() {
 
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      console.log("Formulario enviado:", formData);
+      const { formDataToRegistration } = await import(
+        "@/lib/registrations/serialize"
+      );
+      const payload = formDataToRegistration(formData);
+      const res = await fetch("/api/registrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error || "Error al enviar");
+      }
       setCurrentStep("success");
     } catch {
       setErrors({ submit: "Error al enviar el formulario. Intenta nuevamente." });
@@ -426,8 +439,13 @@ export function MoliEmprendeWizard() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-4 shrink-0 text-center sm:mb-6"
       >
-        <div className="mb-3 flex items-center justify-center gap-2">
-          <Sparkles className="h-6 w-6 text-molina-light" />
+        <div className="mb-3 flex items-center justify-center gap-2.5">
+          <span
+            aria-hidden
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#4ADE80] via-[#008A4B] to-[#065F46] text-[11px] font-black tracking-tighter text-white shadow-[0_4px_14px_rgba(0,138,75,0.55),inset_0_1px_0_rgba(255,255,255,0.35)]"
+          >
+            ME
+          </span>
           <span className="text-sm font-semibold uppercase tracking-widest text-molina">
             Municipalidad de La Molina
           </span>

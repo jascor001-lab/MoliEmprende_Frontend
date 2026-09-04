@@ -23,11 +23,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
-.env
-.env.local
+# local env files (.env.example sí se versiona)
+.env*.local 
 .env.example
+.env.local
+.env
+
+# registros locales del panel admin (no subir datos personales)
+/data
+
 # typescript
 next-env.d.ts
 
