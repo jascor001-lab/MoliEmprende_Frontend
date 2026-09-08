@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/admin/auth";
-import { readRegistrations } from "@/lib/registrations/store";
-import { mergeRegistrationsByDni } from "@/lib/registrations/serialize";
+import { llamarBackend, respuestaDeError } from "@/lib/api/backend";
+
+export interface EstadisticasPanel {
+  totalEnvios: number;
+  totalPersonas: number;
+  emprendedores: number;
+  artesanos: number;
+}
 
 export async function GET() {
-  if (!(await requireAuth())) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const resultado = await llamarBackend<EstadisticasPanel>("/registros/estadisticas");
 
-  const records = await readRegistrations();
-  const unique = mergeRegistrationsByDni(records);
-
-  return NextResponse.json({
-    totalSubmissions: records.length,
-    uniqueByDni: unique.length,
-    emprendedores: unique.filter((r) => r.mainGroup === "emprendedor").length,
-    artesanos: unique.filter((r) => r.mainGroup === "artesano").length,
-  });
+  if (!resultado.ok || !resultado.datos) return respuestaDeError(resultado);
+  return NextResponse.json(resultado.datos);
 }

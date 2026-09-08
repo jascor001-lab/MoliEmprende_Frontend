@@ -9,8 +9,6 @@ import {
   Palette,
   Rocket,
   RefreshCw,
-  LayoutDashboard,
-  UserCog,
   Menu,
   X,
   PanelLeftClose,
@@ -18,122 +16,110 @@ import {
 } from "lucide-react";
 import type { RegistrationRecord } from "@/lib/registrations/types";
 import { downloadRegistrationsExcel } from "@/lib/registrations/excel";
-import type { PublicPanelUser } from "@/lib/admin/types";
+import type { MenuPanel, UsuarioPanel } from "@/lib/admin/types";
+import { esAdministrador } from "@/lib/admin/types";
 import { UserManagement } from "@/components/admin/UserManagement";
+import { IconoMenu } from "@/components/admin/IconoMenu";
 
-type AdminSection = "resumen" | "usuarios";
-
-interface Stats {
-  totalSubmissions: number;
-  uniqueByDni: number;
+interface Estadisticas {
+  totalEnvios: number;
+  totalPersonas: number;
   emprendedores: number;
   artesanos: number;
 }
 
 interface AdminDashboardProps {
-  currentUser: PublicPanelUser;
+  usuarioActual: UsuarioPanel;
 }
 
-export function AdminDashboard({ currentUser }: AdminDashboardProps) {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [records, setRecords] = useState<RegistrationRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+export function AdminDashboard({ usuarioActual }: AdminDashboardProps) {
+  const [menus, setMenus] = useState<MenuPanel[]>([]);
+  const [estadisticas, setEstadisticas] = useState<Estadisticas | null>(null);
+  const [registros, setRegistros] = useState<RegistrationRecord[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [downloading, setDownloading] = useState(false);
-  const [section, setSection] = useState<AdminSection>("resumen");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [descargando, setDescargando] = useState(false);
+  const [seccion, setSeccion] = useState<string>("");
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+  const [barraColapsada, setBarraColapsada] = useState(false);
 
-  const isAdmin = currentUser.role === "admin";
+  const esAdmin = esAdministrador(usuarioActual);
+  const menuActivo = menus.find((menu) => menu.codigo === seccion) ?? null;
 
-  const navItems: {
-    id: AdminSection;
-    label: string;
-    icon: React.ReactNode;
-    adminOnly?: boolean;
-  }[] = [
-    {
-      id: "resumen",
-      label: "Resumen",
-      icon: <LayoutDashboard className="h-5 w-5 shrink-0" />,
-    },
-    {
-      id: "usuarios",
-      label: "Usuarios",
-      icon: <UserCog className="h-5 w-5 shrink-0" />,
-      adminOnly: true,
-    },
-  ];
-
-  const visibleNav = navItems.filter((item) => !item.adminOnly || isAdmin);
-
-  const load = async () => {
-    setLoading(true);
+  const cargar = async () => {
+    setCargando(true);
     setError("");
     try {
-      const [statsRes, listRes] = await Promise.all([
+      const [resMenus, resEstadisticas, resRegistros] = await Promise.all([
+        fetch("/api/admin/menus"),
         fetch("/api/admin/stats"),
         fetch("/api/admin/registrations"),
       ]);
 
-      if (statsRes.status === 401 || listRes.status === 401) {
+      if ([resMenus, resEstadisticas, resRegistros].some((res) => res.status === 401)) {
         window.location.reload();
         return;
       }
 
-      if (!statsRes.ok || !listRes.ok) {
+      if (!resMenus.ok || !resEstadisticas.ok || !resRegistros.ok) {
         throw new Error("No se pudieron cargar los datos");
       }
 
-      const statsData = (await statsRes.json()) as Stats;
-      const listData = (await listRes.json()) as {
+      const datosMenus = (await resMenus.json()) as { menus: MenuPanel[] };
+      const datosEstadisticas = (await resEstadisticas.json()) as Estadisticas;
+      const datosRegistros = (await resRegistros.json()) as {
         records: RegistrationRecord[];
       };
 
-      setStats(statsData);
-      setRecords(listData.records);
+      setMenus(datosMenus.menus);
+      setEstadisticas(datosEstadisticas);
+      setRegistros(datosRegistros.records);
     } catch {
       setError("Error al cargar el panel. Intenta de nuevo.");
     } finally {
-      setLoading(false);
+      setCargando(false);
     }
   };
 
   useEffect(() => {
-    load();
+    cargar();
   }, []);
 
+  // La sección visible siempre debe ser uno de los menús que el rol tiene permitidos.
   useEffect(() => {
-    if (!isAdmin && section === "usuarios") setSection("resumen");
-  }, [isAdmin, section]);
+    if (menus.length === 0) return;
+    if (!menus.some((menu) => menu.codigo === seccion)) {
+      setSeccion(menus[0].codigo);
+    }
+  }, [menus, seccion]);
 
-  const handleLogout = async () => {
+  const cerrarSesion = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
     window.location.reload();
   };
 
-  const handleDownload = () => {
-    setDownloading(true);
+  const descargarExcel = () => {
+    setDescargando(true);
     try {
-      downloadRegistrationsExcel(records);
+      downloadRegistrationsExcel(registros);
     } finally {
-      setDownloading(false);
+      setDescargando(false);
     }
   };
 
-  const selectSection = (id: AdminSection) => {
-    setSection(id);
-    setMobileOpen(false);
+  const elegirSeccion = (codigo: string) => {
+    setSeccion(codigo);
+    setMenuMovilAbierto(false);
   };
 
-  const renderSidebar = (collapsed: boolean) => (
+  const renderBarraLateral = (colapsada: boolean) => (
     <div className="flex h-full flex-col">
       <div className="border-b border-white/10 px-4 py-5">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#4ADE80] via-[#008A4B] to-[#065F46] text-[10px] font-black text-white shadow-md">
             ME
           </span>
-          {!collapsed && (
+          {!colapsada && (
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-white">MoliEmprende</p>
               <p className="truncate text-xs text-emerald-100/80">Panel interno</p>
@@ -143,48 +129,48 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {visibleNav.map((item) => {
-          const active = section === item.id;
+        {menus.map((menu) => {
+          const activo = seccion === menu.codigo;
           return (
             <button
-              key={item.id}
+              key={menu.id}
               type="button"
-              onClick={() => selectSection(item.id)}
-              title={item.label}
+              onClick={() => elegirSeccion(menu.codigo)}
+              title={menu.nombre}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                active
+                activo
                   ? "bg-white text-molina shadow-sm"
                   : "text-emerald-50/90 hover:bg-white/10"
-              } ${collapsed ? "justify-center" : ""}`}
+              } ${colapsada ? "justify-center" : ""}`}
             >
-              {item.icon}
-              {!collapsed && <span>{item.label}</span>}
+              <IconoMenu nombre={menu.icono} className="h-5 w-5 shrink-0" />
+              {!colapsada && <span>{menu.nombre}</span>}
             </button>
           );
         })}
       </nav>
 
       <div className="space-y-2 border-t border-white/10 p-3">
-        {!collapsed && (
+        {!colapsada && (
           <div className="rounded-xl bg-white/10 px-3 py-2">
             <p className="truncate text-sm font-medium text-white">
-              {currentUser.fullName}
+              {usuarioActual.nombreCompleto}
             </p>
             <p className="truncate text-xs text-emerald-100/80">
-              @{currentUser.username} · {isAdmin ? "Admin" : "Usuario"}
+              @{usuarioActual.usuario} · {usuarioActual.rol.etiqueta}
             </p>
           </div>
         )}
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={cerrarSesion}
           title="Salir"
           className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-emerald-50/90 transition hover:bg-white/10 ${
-            collapsed ? "justify-center" : ""
+            colapsada ? "justify-center" : ""
           }`}
         >
           <LogOut className="h-5 w-5 shrink-0" />
-          {!collapsed && <span>Salir</span>}
+          {!colapsada && <span>Salir</span>}
         </button>
       </div>
     </div>
@@ -192,30 +178,30 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   return (
     <div className="flex h-full min-h-0 w-full">
-      {/* Desktop sidebar */}
+      {/* Barra lateral de escritorio */}
       <aside
         className={`relative z-20 hidden shrink-0 bg-gradient-to-b from-[#008A4B] to-[#065F46] transition-all duration-300 md:flex md:flex-col ${
-          sidebarCollapsed ? "w-[72px]" : "w-64"
+          barraColapsada ? "w-[72px]" : "w-64"
         }`}
       >
         <button
           type="button"
-          onClick={() => setSidebarCollapsed((v) => !v)}
+          onClick={() => setBarraColapsada((v) => !v)}
           className="absolute -right-3 top-20 z-30 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-molina shadow-sm"
-          aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+          aria-label={barraColapsada ? "Expandir menú" : "Colapsar menú"}
         >
-          {sidebarCollapsed ? (
+          {barraColapsada ? (
             <PanelLeft className="h-3.5 w-3.5" />
           ) : (
             <PanelLeftClose className="h-3.5 w-3.5" />
           )}
         </button>
-        {renderSidebar(sidebarCollapsed)}
+        {renderBarraLateral(barraColapsada)}
       </aside>
 
-      {/* Mobile slider overlay */}
+      {/* Menú deslizable en móvil */}
       <AnimatePresence>
-        {mobileOpen && (
+        {menuMovilAbierto && (
           <>
             <motion.button
               type="button"
@@ -224,7 +210,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-40 bg-black/40 md:hidden"
-              onClick={() => setMobileOpen(false)}
+              onClick={() => setMenuMovilAbierto(false)}
             />
             <motion.aside
               initial={{ x: "-100%" }}
@@ -235,25 +221,25 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             >
               <button
                 type="button"
-                onClick={() => setMobileOpen(false)}
+                onClick={() => setMenuMovilAbierto(false)}
                 className="absolute right-3 top-4 rounded-lg p-2 text-white/80 hover:bg-white/10"
                 aria-label="Cerrar"
               >
                 <X className="h-5 w-5" />
               </button>
-              {renderSidebar(false)}
+              {renderBarraLateral(false)}
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      {/* Main content */}
+      {/* Contenido principal */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur md:px-6">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setMobileOpen(true)}
+              onClick={() => setMenuMovilAbierto(true)}
               className="rounded-xl border border-slate-200 p-2 text-slate-700 md:hidden"
               aria-label="Abrir menú"
             >
@@ -261,17 +247,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </button>
             <div>
               <h1 className="text-lg font-bold text-molina-dark sm:text-xl">
-                {section === "resumen" && "Resumen de registros"}
-                {section === "usuarios" && "Gestión de usuarios"}
+                {tituloDeSeccion(menuActivo)}
               </h1>
               <p className="hidden text-xs text-slate-500 sm:block">
-                {isAdmin ? "Administrador" : "Usuario de consulta"}
+                {usuarioActual.rol.etiqueta}
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={load}
+            onClick={cargar}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             <RefreshCw className="h-4 w-4" />
@@ -286,40 +271,40 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </p>
           )}
 
-          {loading ? (
+          {cargando ? (
             <p className="text-sm text-slate-500">Cargando…</p>
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
-                key={section}
+                key={seccion}
                 initial={{ opacity: 0, x: 24 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -16 }}
                 transition={{ duration: 0.22 }}
                 className="mx-auto max-w-4xl space-y-6"
               >
-                {section === "resumen" && (
+                {seccion === "resumen" && (
                   <>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <StatCard
-                        icon={<Users className="h-5 w-5 text-molina" />}
-                        label="Personas (por DNI)"
-                        value={stats?.uniqueByDni ?? 0}
+                      <Tarjeta
+                        icono={<Users className="h-5 w-5 text-molina" />}
+                        etiqueta="Personas (por DNI)"
+                        valor={estadisticas?.totalPersonas ?? 0}
                       />
-                      <StatCard
-                        icon={<Rocket className="h-5 w-5 text-molina" />}
-                        label="Emprendedores"
-                        value={stats?.emprendedores ?? 0}
+                      <Tarjeta
+                        icono={<Rocket className="h-5 w-5 text-molina" />}
+                        etiqueta="Emprendedores"
+                        valor={estadisticas?.emprendedores ?? 0}
                       />
-                      <StatCard
-                        icon={<Palette className="h-5 w-5 text-molina" />}
-                        label="Artesanos"
-                        value={stats?.artesanos ?? 0}
+                      <Tarjeta
+                        icono={<Palette className="h-5 w-5 text-molina" />}
+                        etiqueta="Artesanos"
+                        valor={estadisticas?.artesanos ?? 0}
                       />
-                      <StatCard
-                        icon={<Users className="h-5 w-5 text-slate-500" />}
-                        label="Envíos totales"
-                        value={stats?.totalSubmissions ?? 0}
+                      <Tarjeta
+                        icono={<Users className="h-5 w-5 text-slate-500" />}
+                        etiqueta="Envíos totales"
+                        valor={estadisticas?.totalEnvios ?? 0}
                       />
                     </div>
 
@@ -333,14 +318,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       </p>
                       <button
                         type="button"
-                        onClick={handleDownload}
-                        disabled={downloading || records.length === 0}
+                        onClick={descargarExcel}
+                        disabled={descargando || registros.length === 0}
                         className="mt-4 inline-flex items-center gap-2 rounded-xl bg-molina px-5 py-3 text-sm font-semibold text-white transition hover:bg-molina-dark disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Download className="h-4 w-4" />
-                        {downloading ? "Generando…" : "Descargar Excel"}
+                        {descargando ? "Generando…" : "Descargar Excel"}
                       </button>
-                      {records.length === 0 && (
+                      {registros.length === 0 && (
                         <p className="mt-3 text-sm text-slate-500">
                           Aún no hay registros. Cuando alguien complete el formulario,
                           aparecerán aquí.
@@ -350,8 +335,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </>
                 )}
 
-                {section === "usuarios" && isAdmin && (
-                  <UserManagement currentUserId={currentUser.id} />
+                {seccion === "usuarios" && esAdmin && (
+                  <UserManagement
+                    idUsuarioActual={usuarioActual.id}
+                    permisos={menuActivo?.permisos}
+                  />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -362,22 +350,27 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
+function tituloDeSeccion(menu: MenuPanel | null): string {
+  if (!menu) return "Panel";
+  return menu.codigo === "resumen" ? "Resumen de registros" : `Gestión de ${menu.nombre.toLowerCase()}`;
+}
+
+function Tarjeta({
+  icono,
+  etiqueta,
+  valor,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
+  icono: React.ReactNode;
+  etiqueta: string;
+  valor: number;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
       <div className="flex items-center gap-2 text-slate-600">
-        {icon}
-        <span className="text-sm font-medium">{label}</span>
+        {icono}
+        <span className="text-sm font-medium">{etiqueta}</span>
       </div>
-      <p className="mt-3 text-3xl font-bold text-molina-dark">{value}</p>
+      <p className="mt-3 text-3xl font-bold text-molina-dark">{valor}</p>
     </div>
   );
 }

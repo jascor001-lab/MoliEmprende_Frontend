@@ -8,20 +8,20 @@ interface AdminLoginProps {
 }
 
 export function AdminLogin({ onSuccess }: AdminLoginProps) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [cargando, setCargando] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setCargando(true);
     setError("");
     try {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ usuario, contrasena }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -32,7 +32,7 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
     } catch {
       setError("Error de conexión");
     } finally {
-      setLoading(false);
+      setCargando(false);
     }
   };
 
@@ -53,12 +53,12 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="admin-user" className="mb-1 block text-sm font-medium text-slate-700">
-            Usuario
+            Usuario o correo
           </label>
           <input
             id="admin-user"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value)}
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-molina"
             autoComplete="username"
             required
@@ -71,8 +71,8 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
           <input
             id="admin-pass"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={contrasena}
+            onChange={(e) => setContrasena(e.target.value)}
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-molina"
             autoComplete="current-password"
             required
@@ -81,10 +81,10 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
         {error && <p className="text-sm text-red-500">{error}</p>}
         <button
           type="submit"
-          disabled={loading}
+          disabled={cargando}
           className="w-full rounded-xl bg-molina py-3 text-sm font-semibold text-white hover:bg-molina-dark disabled:opacity-50"
         >
-          {loading ? "Ingresando…" : "Ingresar"}
+          {cargando ? "Ingresando…" : "Ingresar"}
         </button>
       </form>
     </div>

@@ -1,97 +1,62 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
-import {
-  createUser,
-  deleteUser,
-  listUsers,
-  setUserActive,
-  type PanelRole,
-} from "@/lib/admin/users";
+import { llamarBackend, respuestaDeError } from "@/lib/api/backend";
+import type { UsuarioPanel } from "@/lib/admin/types";
 
 export async function GET() {
-  if (!(await requireAdmin())) {
-    return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
-  }
+  const resultado = await llamarBackend<{ usuarios: UsuarioPanel[] }>("/usuarios");
 
-  const users = await listUsers();
-  return NextResponse.json({ users });
+  if (!resultado.ok || !resultado.datos) return respuestaDeError(resultado);
+  return NextResponse.json({ usuarios: resultado.datos.usuarios });
 }
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
-  }
-
+  let cuerpo: Record<string, unknown>;
   try {
-    const body = (await request.json()) as {
-      username?: string;
-      password?: string;
-      role?: PanelRole;
-      fullName?: string;
-    };
-
-    const user = await createUser({
-      username: body.username || "",
-      password: body.password || "",
-      role: body.role === "admin" ? "admin" : "user",
-      fullName: body.fullName || "",
-    });
-
-    return NextResponse.json({ ok: true, user }, { status: 201 });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "No se pudo crear el usuario" },
-      { status: 400 }
-    );
+    cuerpo = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
+
+  const resultado = await llamarBackend<{ usuario: UsuarioPanel }>("/usuarios", {
+    metodo: "POST",
+    cuerpo,
+  });
+
+  if (!resultado.ok || !resultado.datos) return respuestaDeError(resultado);
+  return NextResponse.json({ ok: true, usuario: resultado.datos.usuario }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
-  const session = await requireAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
-  }
-
+  let cuerpo: { id?: string; activo?: boolean };
   try {
-    const body = (await request.json()) as {
-      id?: string;
-      active?: boolean;
-    };
-
-    if (!body.id || typeof body.active !== "boolean") {
-      return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
-    }
-
-    const user = await setUserActive(body.id, body.active, session.userId);
-    return NextResponse.json({ ok: true, user });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "No se pudo actualizar" },
-      { status: 400 }
-    );
+    cuerpo = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
+
+  if (!cuerpo.id || typeof cuerpo.activo !== "boolean") {
+    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+  }
+
+  const resultado = await llamarBackend<{ usuario: UsuarioPanel }>(
+    `/usuarios/${encodeURIComponent(cuerpo.id)}/estado`,
+    { metodo: "PATCH", cuerpo: { activo: cuerpo.activo } }
+  );
+
+  if (!resultado.ok || !resultado.datos) return respuestaDeError(resultado);
+  return NextResponse.json({ ok: true, usuario: resultado.datos.usuario });
 }
 
 export async function DELETE(request: Request) {
-  const session = await requireAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Falta id" }, { status: 400 });
   }
 
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ error: "Falta id" }, { status: 400 });
-    }
+  const resultado = await llamarBackend(`/usuarios/${encodeURIComponent(id)}`, {
+    metodo: "DELETE",
+  });
 
-    await deleteUser(id, session.userId);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "No se pudo eliminar" },
-      { status: 400 }
-    );
-  }
+  if (!resultado.ok) return respuestaDeError(resultado);
+  return NextResponse.json({ ok: true });
 }

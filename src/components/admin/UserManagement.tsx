@@ -2,112 +2,133 @@
 
 import { useEffect, useState } from "react";
 import { ShieldPlus, Trash2, UserCheck, UserX } from "lucide-react";
-import type { PanelRole, PublicPanelUser } from "@/lib/admin/types";
+import {
+  ROL_ADMINISTRADOR,
+  ROL_CONSULTOR,
+  type PermisosMenu,
+  type RolPanel,
+  type UsuarioPanel,
+} from "@/lib/admin/types";
 
 interface UserManagementProps {
-  currentUserId: string;
+  idUsuarioActual: string;
+  permisos?: PermisosMenu;
 }
 
-export function UserManagement({ currentUserId }: UserManagementProps) {
-  const [users, setUsers] = useState<PublicPanelUser[]>([]);
-  const [loading, setLoading] = useState(true);
+export function UserManagement({ idUsuarioActual, permisos }: UserManagementProps) {
+  const [usuarios, setUsuarios] = useState<UsuarioPanel[]>([]);
+  const [roles, setRoles] = useState<RolPanel[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [exito, setExito] = useState("");
+  const [guardando, setGuardando] = useState(false);
 
-  const [fullName, setFullName] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<PanelRole>("user");
+  const [nombreCompleto, setNombreCompleto] = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [contrasena, setContrasena] = useState("");
+  const [rol, setRol] = useState<string>(ROL_CONSULTOR);
 
-  const loadUsers = async () => {
-    setLoading(true);
+  const puedeCrear = permisos?.puedeCrear ?? true;
+  const puedeEditar = permisos?.puedeEditar ?? true;
+  const puedeEliminar = permisos?.puedeEliminar ?? true;
+
+  const cargar = async () => {
+    setCargando(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/users");
-      if (res.status === 403) {
+      const [resUsuarios, resRoles] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/roles"),
+      ]);
+
+      if (resUsuarios.status === 403) {
         setError("No tienes permiso para gestionar usuarios");
         return;
       }
-      if (!res.ok) throw new Error("Error al cargar usuarios");
-      const data = (await res.json()) as { users: PublicPanelUser[] };
-      setUsers(data.users);
+      if (!resUsuarios.ok || !resRoles.ok) throw new Error("Error al cargar");
+
+      const datosUsuarios = (await resUsuarios.json()) as { usuarios: UsuarioPanel[] };
+      const datosRoles = (await resRoles.json()) as { roles: RolPanel[] };
+
+      setUsuarios(datosUsuarios.usuarios);
+      setRoles(datosRoles.roles);
     } catch {
       setError("No se pudieron cargar los usuarios");
     } finally {
-      setLoading(false);
+      setCargando(false);
     }
   };
 
   useEffect(() => {
-    loadUsers();
+    cargar();
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const crearUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
+    setGuardando(true);
     setError("");
-    setSuccess("");
+    setExito("");
     try {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, username, password, role }),
+        body: JSON.stringify({ nombreCompleto, usuario, correo, contrasena, rol }),
       });
-      const data = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
+      const datos = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        setError(data?.error || "No se pudo crear el usuario");
+        setError(datos?.error || "No se pudo crear el usuario");
         return;
       }
-      setSuccess(
-        role === "admin"
+
+      setExito(
+        rol === ROL_ADMINISTRADOR
           ? "Administrador creado. Puede ver datos, Excel y gestionar usuarios."
           : "Usuario creado. Puede ver información y descargar Excel."
       );
-      setFullName("");
-      setUsername("");
-      setPassword("");
-      setRole("user");
-      await loadUsers();
+      setNombreCompleto("");
+      setUsuario("");
+      setCorreo("");
+      setContrasena("");
+      setRol(ROL_CONSULTOR);
+      await cargar();
     } catch {
       setError("Error de conexión al crear usuario");
     } finally {
-      setSaving(false);
+      setGuardando(false);
     }
   };
 
-  const handleToggleActive = async (user: PublicPanelUser) => {
+  const alternarEstado = async (destino: UsuarioPanel) => {
     setError("");
-    setSuccess("");
+    setExito("");
     const res = await fetch("/api/admin/users", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: user.id, active: !user.active }),
+      body: JSON.stringify({ id: destino.id, activo: !destino.activo }),
     });
-    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    const datos = (await res.json().catch(() => null)) as { error?: string } | null;
     if (!res.ok) {
-      setError(data?.error || "No se pudo actualizar");
+      setError(datos?.error || "No se pudo actualizar");
       return;
     }
-    await loadUsers();
+    await cargar();
   };
 
-  const handleDelete = async (user: PublicPanelUser) => {
-    if (!confirm(`¿Eliminar al usuario "${user.username}"?`)) return;
+  const eliminar = async (destino: UsuarioPanel) => {
+    if (!confirm(`¿Eliminar al usuario "${destino.usuario}"?`)) return;
     setError("");
-    setSuccess("");
-    const res = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, {
+    setExito("");
+    const res = await fetch(`/api/admin/users?id=${encodeURIComponent(destino.id)}`, {
       method: "DELETE",
     });
-    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    const datos = (await res.json().catch(() => null)) as { error?: string } | null;
     if (!res.ok) {
-      setError(data?.error || "No se pudo eliminar");
+      setError(datos?.error || "No se pudo eliminar");
       return;
     }
-    setSuccess("Usuario eliminado");
-    await loadUsers();
+    setExito("Usuario eliminado");
+    await cargar();
   };
 
   return (
@@ -121,109 +142,128 @@ export function UserManagement({ currentUserId }: UserManagementProps) {
         Excel) o <strong>Usuario</strong> (ve información y descarga Excel).
       </p>
 
-      <form onSubmit={handleCreate} className="mb-6 grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">
-            Nombre completo
-          </label>
-          <input
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
-            placeholder="Ana Pérez"
-            required
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Usuario</label>
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
-            placeholder="aperez"
-            minLength={3}
-            required
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">
-            Contraseña
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
-            placeholder="Mínimo 6 caracteres"
-            minLength={6}
-            required
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">
-            Tipo de usuario
-          </label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as PanelRole)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
-          >
-            <option value="user">Usuario (ver + Excel)</option>
-            <option value="admin">Administrador (gestión + ver + Excel)</option>
-          </select>
-        </div>
-        <div className="sm:col-span-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-xl bg-molina px-5 py-2.5 text-sm font-semibold text-white hover:bg-molina-dark disabled:opacity-50"
-          >
-            {saving ? "Creando…" : "Crear usuario"}
-          </button>
-        </div>
-      </form>
+      {puedeCrear && (
+        <form onSubmit={crearUsuario} className="mb-6 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Nombre completo
+            </label>
+            <input
+              value={nombreCompleto}
+              onChange={(e) => setNombreCompleto(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
+              placeholder="Ana Pérez"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Usuario</label>
+            <input
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
+              placeholder="aperez"
+              minLength={3}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Correo</label>
+            <input
+              type="email"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
+              placeholder="aperez@lamolina.gob.pe"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Contraseña
+            </label>
+            <input
+              type="password"
+              value={contrasena}
+              onChange={(e) => setContrasena(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
+              placeholder="Mínimo 6 caracteres"
+              minLength={6}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Tipo de usuario
+            </label>
+            <select
+              value={rol}
+              onChange={(e) => setRol(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
+            >
+              {roles.map((opcion) => (
+                <option key={opcion.id} value={opcion.nombre}>
+                  {opcion.etiqueta}
+                  {opcion.descripcion ? ` — ${opcion.descripcion}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              disabled={guardando}
+              className="rounded-xl bg-molina px-5 py-2.5 text-sm font-semibold text-white hover:bg-molina-dark disabled:opacity-50"
+            >
+              {guardando ? "Creando…" : "Crear usuario"}
+            </button>
+          </div>
+        </form>
+      )}
 
       {error && (
         <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
-      {success && (
+      {exito && (
         <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          {success}
+          {exito}
         </p>
       )}
 
-      {loading ? (
+      {cargando ? (
         <p className="text-sm text-slate-500">Cargando usuarios…</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] text-left text-sm">
+          <table className="w-full min-w-[620px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-slate-500">
                 <th className="pb-2 pr-3 font-medium">Nombre</th>
                 <th className="pb-2 pr-3 font-medium">Usuario</th>
+                <th className="pb-2 pr-3 font-medium">Correo</th>
                 <th className="pb-2 pr-3 font-medium">Rol</th>
                 <th className="pb-2 pr-3 font-medium">Estado</th>
                 <th className="pb-2 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b border-slate-100">
-                  <td className="py-3 pr-3 text-molina-dark">{user.fullName}</td>
-                  <td className="py-3 pr-3">{user.username}</td>
+              {usuarios.map((fila) => (
+                <tr key={fila.id} className="border-b border-slate-100">
+                  <td className="py-3 pr-3 text-molina-dark">{fila.nombreCompleto}</td>
+                  <td className="py-3 pr-3">{fila.usuario}</td>
+                  <td className="py-3 pr-3 text-slate-500">{fila.correo}</td>
                   <td className="py-3 pr-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        user.role === "admin"
+                        fila.rol.nombre === ROL_ADMINISTRADOR
                           ? "bg-molina/10 text-molina"
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {user.role === "admin" ? "Administrador" : "Usuario"}
+                      {fila.rol.etiqueta}
                     </span>
                   </td>
                   <td className="py-3 pr-3">
-                    {user.active ? (
+                    {fila.activo ? (
                       <span className="text-emerald-600">Activo</span>
                     ) : (
                       <span className="text-slate-400">Inactivo</span>
@@ -233,12 +273,12 @@ export function UserManagement({ currentUserId }: UserManagementProps) {
                     <div className="flex gap-1">
                       <button
                         type="button"
-                        title={user.active ? "Desactivar" : "Activar"}
-                        disabled={user.id === currentUserId}
-                        onClick={() => handleToggleActive(user)}
+                        title={fila.activo ? "Desactivar" : "Activar"}
+                        disabled={!puedeEditar || fila.id === idUsuarioActual}
+                        onClick={() => alternarEstado(fila)}
                         className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
                       >
-                        {user.active ? (
+                        {fila.activo ? (
                           <UserX className="h-4 w-4" />
                         ) : (
                           <UserCheck className="h-4 w-4" />
@@ -247,8 +287,8 @@ export function UserManagement({ currentUserId }: UserManagementProps) {
                       <button
                         type="button"
                         title="Eliminar"
-                        disabled={user.id === currentUserId}
-                        onClick={() => handleDelete(user)}
+                        disabled={!puedeEliminar || fila.id === idUsuarioActual}
+                        onClick={() => eliminar(fila)}
                         className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
                       >
                         <Trash2 className="h-4 w-4" />

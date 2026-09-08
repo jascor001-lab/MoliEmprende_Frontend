@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/admin/auth";
-import { readRegistrations } from "@/lib/registrations/store";
-import { mergeRegistrationsByDni } from "@/lib/registrations/serialize";
+import { llamarBackend, respuestaDeError } from "@/lib/api/backend";
+import { aRegistroPanel } from "@/lib/registrations/mapeo";
 
 export async function GET() {
-  if (!(await requireAuth())) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const resultado = await llamarBackend<{ registros: Record<string, unknown>[] }>(
+    "/registros"
+  );
 
-  const records = await readRegistrations();
-  const merged = mergeRegistrationsByDni(records);
+  if (!resultado.ok || !resultado.datos) return respuestaDeError(resultado);
 
-  return NextResponse.json({
-    records: merged,
-    total: merged.length,
-  });
+  const records = resultado.datos.registros.map(aRegistroPanel);
+  return NextResponse.json({ records, total: records.length });
 }

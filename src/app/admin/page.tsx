@@ -3,34 +3,34 @@
 import { useEffect, useState } from "react";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
-import type { PublicPanelUser } from "@/lib/admin/types";
+import type { UsuarioPanel } from "@/lib/admin/types";
 
 export default function AdminPage() {
-  const [user, setUser] = useState<PublicPanelUser | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [usuario, setUsuario] = useState<UsuarioPanel | null>(null);
+  const [verificando, setVerificando] = useState(true);
 
-  const checkSession = async () => {
-    setChecking(true);
+  const verificarSesion = async () => {
+    setVerificando(true);
     try {
       const res = await fetch("/api/admin/me");
       if (!res.ok) {
-        setUser(null);
+        setUsuario(null);
         return;
       }
-      const data = (await res.json()) as { user: PublicPanelUser };
-      setUser(data.user);
+      const data = (await res.json()) as { usuario: UsuarioPanel };
+      setUsuario(data.usuario);
     } catch {
-      setUser(null);
+      setUsuario(null);
     } finally {
-      setChecking(false);
+      setVerificando(false);
     }
   };
 
   useEffect(() => {
-    checkSession();
+    verificarSesion();
   }, []);
 
-  if (checking) {
+  if (verificando) {
     return (
       <main className="flex h-full items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-slate-100">
         <p className="text-sm text-slate-500">Verificando sesión…</p>
@@ -38,17 +38,17 @@ export default function AdminPage() {
     );
   }
 
-  if (!user) {
+  if (!usuario) {
     return (
       <main className="flex h-full items-center justify-center overflow-y-auto bg-gradient-to-br from-emerald-50 via-white to-slate-100 px-4 py-10">
-        <AdminLogin onSuccess={checkSession} />
+        <AdminLogin onSuccess={verificarSesion} />
       </main>
     );
   }
 
   return (
     <main className="flex h-full min-h-0 bg-gradient-to-br from-emerald-50 via-white to-slate-100">
-      <AdminDashboard currentUser={user} />
+      <AdminDashboard usuarioActual={usuario} />
     </main>
   );
 }
