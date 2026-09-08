@@ -26,37 +26,25 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, usuario: resultado.datos.usuario }, { status: 201 });
 }
 
+/** Sirve tanto para editar los datos como para activar o desactivar la cuenta. */
 export async function PATCH(request: Request) {
-  let cuerpo: { id?: string; activo?: boolean };
+  let cuerpo: Record<string, unknown> & { id?: string };
   try {
     cuerpo = await request.json();
   } catch {
     return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
 
-  if (!cuerpo.id || typeof cuerpo.activo !== "boolean") {
-    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
-  }
-
-  const resultado = await llamarBackend<{ usuario: UsuarioPanel }>(
-    `/usuarios/${encodeURIComponent(cuerpo.id)}/estado`,
-    { metodo: "PATCH", cuerpo: { activo: cuerpo.activo } }
-  );
-
-  if (!resultado.ok || !resultado.datos) return respuestaDeError(resultado);
-  return NextResponse.json({ ok: true, usuario: resultado.datos.usuario });
-}
-
-export async function DELETE(request: Request) {
-  const id = new URL(request.url).searchParams.get("id");
+  const { id, ...cambios } = cuerpo;
   if (!id) {
     return NextResponse.json({ error: "Falta id" }, { status: 400 });
   }
 
-  const resultado = await llamarBackend(`/usuarios/${encodeURIComponent(id)}`, {
-    metodo: "DELETE",
-  });
+  const resultado = await llamarBackend<{ usuario: UsuarioPanel }>(
+    `/usuarios/${encodeURIComponent(id)}`,
+    { metodo: "PATCH", cuerpo: cambios }
+  );
 
-  if (!resultado.ok) return respuestaDeError(resultado);
-  return NextResponse.json({ ok: true });
+  if (!resultado.ok || !resultado.datos) return respuestaDeError(resultado);
+  return NextResponse.json({ ok: true, usuario: resultado.datos.usuario });
 }

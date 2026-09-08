@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldPlus, Trash2, UserCheck, UserX } from "lucide-react";
+import { Pencil, ShieldPlus, UserCheck, UserX, X } from "lucide-react";
 import {
   ROL_ADMINISTRADOR,
   ROL_CONSULTOR,
@@ -15,6 +15,14 @@ interface UserManagementProps {
   permisos?: PermisosMenu;
 }
 
+const FORMULARIO_VACIO = {
+  nombreCompleto: "",
+  usuario: "",
+  correo: "",
+  contrasena: "",
+  rol: ROL_CONSULTOR,
+};
+
 export function UserManagement({ idUsuarioActual, permisos }: UserManagementProps) {
   const [usuarios, setUsuarios] = useState<UsuarioPanel[]>([]);
   const [roles, setRoles] = useState<RolPanel[]>([]);
@@ -23,15 +31,15 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
   const [exito, setExito] = useState("");
   const [guardando, setGuardando] = useState(false);
 
-  const [nombreCompleto, setNombreCompleto] = useState("");
-  const [usuario, setUsuario] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [contrasena, setContrasena] = useState("");
-  const [rol, setRol] = useState<string>(ROL_CONSULTOR);
+  const [formulario, setFormulario] = useState(FORMULARIO_VACIO);
+  const [editando, setEditando] = useState<UsuarioPanel | null>(null);
 
   const puedeCrear = permisos?.puedeCrear ?? true;
   const puedeEditar = permisos?.puedeEditar ?? true;
-  const puedeEliminar = permisos?.puedeEliminar ?? true;
+  const editandoSuPropiaCuenta = editando?.id === idUsuarioActual;
+
+  const actualizarCampo = (campo: keyof typeof FORMULARIO_VACIO, valor: string) =>
+    setFormulario((previo) => ({ ...previo, [campo]: valor }));
 
   const cargar = async () => {
     setCargando(true);
@@ -64,36 +72,66 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
     cargar();
   }, []);
 
-  const crearUsuario = async (e: React.FormEvent) => {
+  const iniciarEdicion = (destino: UsuarioPanel) => {
+    setEditando(destino);
+    setFormulario({
+      nombreCompleto: destino.nombreCompleto,
+      usuario: destino.usuario,
+      correo: destino.correo,
+      contrasena: "",
+      rol: destino.rol.nombre,
+    });
+    setError("");
+    setExito("");
+  };
+
+  const cancelarEdicion = () => {
+    setEditando(null);
+    setFormulario(FORMULARIO_VACIO);
+    setError("");
+    setExito("");
+  };
+
+  const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
     setGuardando(true);
     setError("");
     setExito("");
+
     try {
-      const res = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombreCompleto, usuario, correo, contrasena, rol }),
-      });
+      const res = editando
+        ? await fetch("/api/admin/users", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: editando.id, ...formulario }),
+          })
+        : await fetch("/api/admin/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formulario),
+          });
+
       const datos = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        setError(datos?.error || "No se pudo crear el usuario");
+        setError(datos?.error || "No se pudo guardar el usuario");
         return;
       }
 
-      setExito(
-        rol === ROL_ADMINISTRADOR
-          ? "Administrador creado. Puede ver datos, Excel y gestionar usuarios."
-          : "Usuario creado. Puede ver información y descargar Excel."
-      );
-      setNombreCompleto("");
-      setUsuario("");
-      setCorreo("");
-      setContrasena("");
-      setRol(ROL_CONSULTOR);
+      if (editando) {
+        setExito(`Usuario "${formulario.usuario}" actualizado`);
+      } else {
+        setExito(
+          formulario.rol === ROL_ADMINISTRADOR
+            ? "Administrador creado. Puede ver datos, Excel y gestionar usuarios."
+            : "Usuario creado. Puede ver información y descargar Excel."
+        );
+      }
+
+      setEditando(null);
+      setFormulario(FORMULARIO_VACIO);
       await cargar();
     } catch {
-      setError("Error de conexión al crear usuario");
+      setError("Error de conexión al guardar el usuario");
     } finally {
       setGuardando(false);
     }
@@ -115,21 +153,7 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
     await cargar();
   };
 
-  const eliminar = async (destino: UsuarioPanel) => {
-    if (!confirm(`¿Eliminar al usuario "${destino.usuario}"?`)) return;
-    setError("");
-    setExito("");
-    const res = await fetch(`/api/admin/users?id=${encodeURIComponent(destino.id)}`, {
-      method: "DELETE",
-    });
-    const datos = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (!res.ok) {
-      setError(datos?.error || "No se pudo eliminar");
-      return;
-    }
-    setExito("Usuario eliminado");
-    await cargar();
-  };
+  const mostrarFormulario = editando ? puedeEditar : puedeCrear;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm">
@@ -139,18 +163,35 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
       </div>
       <p className="mb-5 text-sm text-slate-600">
         Crea cuentas con rol <strong>Administrador</strong> (gestiona usuarios + ve datos +
-        Excel) o <strong>Usuario</strong> (ve información y descarga Excel).
+        Excel) o <strong>Usuario</strong> (ve información y descarga Excel). Las cuentas no
+        se eliminan: se desactivan para conservar su historial.
       </p>
 
-      {puedeCrear && (
-        <form onSubmit={crearUsuario} className="mb-6 grid gap-3 sm:grid-cols-2">
+      {mostrarFormulario && (
+        <form onSubmit={guardar} className="mb-6 grid gap-3 sm:grid-cols-2">
+          {editando && (
+            <div className="flex items-center justify-between rounded-xl bg-molina/5 px-3 py-2 sm:col-span-2">
+              <p className="text-sm text-molina-dark">
+                Editando a <strong>{editando.nombreCompleto}</strong>
+              </p>
+              <button
+                type="button"
+                onClick={cancelarEdicion}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:bg-white"
+              >
+                <X className="h-3.5 w-3.5" />
+                Cancelar
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">
               Nombre completo
             </label>
             <input
-              value={nombreCompleto}
-              onChange={(e) => setNombreCompleto(e.target.value)}
+              value={formulario.nombreCompleto}
+              onChange={(e) => actualizarCampo("nombreCompleto", e.target.value)}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
               placeholder="Ana Pérez"
               required
@@ -159,8 +200,8 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Usuario</label>
             <input
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
+              value={formulario.usuario}
+              onChange={(e) => actualizarCampo("usuario", e.target.value)}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
               placeholder="aperez"
               minLength={3}
@@ -171,8 +212,8 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
             <label className="mb-1 block text-xs font-medium text-slate-600">Correo</label>
             <input
               type="email"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
+              value={formulario.correo}
+              onChange={(e) => actualizarCampo("correo", e.target.value)}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
               placeholder="aperez@lamolina.gob.pe"
               required
@@ -184,12 +225,14 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
             </label>
             <input
               type="password"
-              value={contrasena}
-              onChange={(e) => setContrasena(e.target.value)}
+              value={formulario.contrasena}
+              onChange={(e) => actualizarCampo("contrasena", e.target.value)}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
-              placeholder="Mínimo 6 caracteres"
+              placeholder={
+                editando ? "Déjala vacía para no cambiarla" : "Mínimo 6 caracteres"
+              }
               minLength={6}
-              required
+              required={!editando}
             />
           </div>
           <div>
@@ -197,9 +240,10 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
               Tipo de usuario
             </label>
             <select
-              value={rol}
-              onChange={(e) => setRol(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina"
+              value={formulario.rol}
+              onChange={(e) => actualizarCampo("rol", e.target.value)}
+              disabled={editandoSuPropiaCuenta}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-molina disabled:bg-slate-50 disabled:text-slate-400"
             >
               {roles.map((opcion) => (
                 <option key={opcion.id} value={opcion.nombre}>
@@ -208,15 +252,33 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
                 </option>
               ))}
             </select>
+            {editandoSuPropiaCuenta && (
+              <p className="mt-1 text-xs text-slate-500">
+                No puedes cambiar tu propio rol.
+              </p>
+            )}
           </div>
-          <div className="sm:col-span-2">
+          <div className="flex items-end gap-2 sm:col-span-2">
             <button
               type="submit"
               disabled={guardando}
               className="rounded-xl bg-molina px-5 py-2.5 text-sm font-semibold text-white hover:bg-molina-dark disabled:opacity-50"
             >
-              {guardando ? "Creando…" : "Crear usuario"}
+              {guardando
+                ? "Guardando…"
+                : editando
+                  ? "Guardar cambios"
+                  : "Crear usuario"}
             </button>
+            {editando && (
+              <button
+                type="button"
+                onClick={cancelarEdicion}
+                className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+            )}
           </div>
         </form>
       )}
@@ -247,7 +309,12 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
             </thead>
             <tbody>
               {usuarios.map((fila) => (
-                <tr key={fila.id} className="border-b border-slate-100">
+                <tr
+                  key={fila.id}
+                  className={`border-b border-slate-100 ${
+                    editando?.id === fila.id ? "bg-molina/5" : ""
+                  }`}
+                >
                   <td className="py-3 pr-3 text-molina-dark">{fila.nombreCompleto}</td>
                   <td className="py-3 pr-3">{fila.usuario}</td>
                   <td className="py-3 pr-3 text-slate-500">{fila.correo}</td>
@@ -273,6 +340,15 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
                     <div className="flex gap-1">
                       <button
                         type="button"
+                        title="Editar"
+                        disabled={!puedeEditar}
+                        onClick={() => iniciarEdicion(fila)}
+                        className="rounded-lg p-2 text-slate-500 hover:bg-molina/10 hover:text-molina disabled:opacity-30"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
                         title={fila.activo ? "Desactivar" : "Activar"}
                         disabled={!puedeEditar || fila.id === idUsuarioActual}
                         onClick={() => alternarEstado(fila)}
@@ -283,15 +359,6 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
                         ) : (
                           <UserCheck className="h-4 w-4" />
                         )}
-                      </button>
-                      <button
-                        type="button"
-                        title="Eliminar"
-                        disabled={!puedeEliminar || fila.id === idUsuarioActual}
-                        onClick={() => eliminar(fila)}
-                        className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
-                      >
-                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
