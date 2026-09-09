@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Pencil, ShieldPlus, UserCheck, UserX, X } from "lucide-react";
+import { mensajeErrorHttp } from "@/lib/api/mensaje-error";
 import {
   ROL_ADMINISTRADOR,
   ROL_CONSULTOR,
@@ -111,9 +112,8 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
             body: JSON.stringify(formulario),
           });
 
-      const datos = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        setError(datos?.error || "No se pudo guardar el usuario");
+        setError(await mensajeErrorHttp(res, "No se pudo guardar el usuario"));
         return;
       }
 
@@ -145,9 +145,8 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: destino.id, activo: !destino.activo }),
     });
-    const datos = (await res.json().catch(() => null)) as { error?: string } | null;
     if (!res.ok) {
-      setError(datos?.error || "No se pudo actualizar");
+      setError(await mensajeErrorHttp(res, "No se pudo actualizar"));
       return;
     }
     await cargar();

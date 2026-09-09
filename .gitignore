@@ -24,10 +24,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files (.env.example sí se versiona)
-.env*.local 
-.env.example
+.env*.local
 .env.local
 .env
+.env.production
 
 # registros locales del panel admin (no subir datos personales)
 /data

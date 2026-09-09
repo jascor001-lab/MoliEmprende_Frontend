@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Shield } from "lucide-react";
+import { mensajeErrorHttp } from "@/lib/api/mensaje-error";
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -24,8 +25,7 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
         body: JSON.stringify({ usuario, contrasena }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        setError(data?.error || "No se pudo iniciar sesión");
+        setError(await mensajeErrorHttp(res, "No se pudo iniciar sesión"));
         return;
       }
       onSuccess();

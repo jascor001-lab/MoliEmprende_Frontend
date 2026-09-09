@@ -19,6 +19,7 @@ import { Step2ArtesanoConNegocio } from "@/components/form/steps/Step2ArtesanoCo
 import { Step2ArtesanoTaller } from "@/components/form/steps/Step2ArtesanoTaller";
 import { Step3Commercial } from "@/components/form/steps/Step3Commercial";
 import { Step3Commitments } from "@/components/form/steps/Step3Commitments";
+import { mensajeErrorHttp } from "@/lib/api/mensaje-error";
 import {
   step0Schema,
   step1Schema,
@@ -303,10 +304,7 @@ export function MoliEmprendeWizard() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(data?.error || "Error al enviar");
+        throw new Error(await mensajeErrorHttp(res, "Error al enviar"));
       }
       setCurrentStep("success");
     } catch {

@@ -3,9 +3,20 @@ import { NextResponse } from "next/server";
 
 export const COOKIE_SESION = "moliemprende_sesion";
 
-/** Solo se usa desde rutas del servidor, así que el token nunca llega al navegador. */
-const URL_API =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5002";
+/**
+ * Base del NestJS, siempre con sufijo `/api` y sin barra final.
+ * En producción debe apuntar al proceso del back (p. ej. http://127.0.0.1:403/api),
+ * nunca al dominio público del front.
+ */
+function urlBaseApi(): string {
+  const cruda =
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://localhost:403/api";
+  const sinBarra = cruda.trim().replace(/\/+$/, "");
+  if (!sinBarra) return "http://localhost:403/api";
+  return /\/api$/i.test(sinBarra) ? sinBarra : `${sinBarra}/api`;
+}
 
 export interface RespuestaBackend<T> {
   ok: boolean;
@@ -38,9 +49,10 @@ export async function llamarBackend<T>(
     cabeceras.Authorization = `Bearer ${token}`;
   }
 
+  const camino = ruta.startsWith("/") ? ruta : `/${ruta}`;
   let respuesta: Response;
   try {
-    respuesta = await fetch(`${URL_API}/api${ruta}`, {
+    respuesta = await fetch(`${urlBaseApi()}${camino}`, {
       method: metodo,
       headers: cabeceras,
       body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
@@ -56,7 +68,28 @@ export async function llamarBackend<T>(
   }
 
   const contenido = await respuesta.text();
-  const cuerpoJson = contenido ? (JSON.parse(contenido) as unknown) : null;
+  if (esHtml(contenido)) {
+    return {
+      ok: false,
+      estado: respuesta.status,
+      datos: null,
+      error: "servicio no encontrado",
+    };
+  }
+
+  let cuerpoJson: unknown = null;
+  if (contenido) {
+    try {
+      cuerpoJson = JSON.parse(contenido) as unknown;
+    } catch {
+      return {
+        ok: false,
+        estado: respuesta.status,
+        datos: null,
+        error: "servicio no encontrado",
+      };
+    }
+  }
 
   if (!respuesta.ok) {
     return {
@@ -76,6 +109,11 @@ export function respuestaDeError(resultado: RespuestaBackend<unknown>): NextResp
     { error: resultado.error ?? "Error inesperado" },
     { status: resultado.estado }
   );
+}
+
+function esHtml(contenido: string): boolean {
+  const recorte = contenido.trimStart();
+  return recorte.startsWith("<") || recorte.toLowerCase().startsWith("<!doctype");
 }
 
 function mensajeDeError(cuerpo: unknown): string {
