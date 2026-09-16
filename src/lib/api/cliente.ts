@@ -1,14 +1,25 @@
 const CLAVE_TOKEN = "moliemprende_token";
 
+function normalizarBase(cruda: string): string {
+  const sinBarra = cruda.trim().replace(/\/+$/, "");
+  if (!sinBarra) return "/api";
+  return /\/api$/i.test(sinBarra) ? sinBarra : `${sinBarra}/api`;
+}
+
+function esDireccionLocal(valor: string): boolean {
+  return /localhost|127\.0\.0\.1/i.test(valor);
+}
+
 /**
- * Base del API NestJS, con sufijo /api y sin barra final.
- * Producción (nginx: /api → back, / → front): NEXT_PUBLIC_API_URL=/api
- * Local: NEXT_PUBLIC_API_URL=http://localhost:403/api
+ * Base del API NestJS.
+ * En el servidor (dominio público) siempre es /api — nginx lo manda al back.
+ * En local usa NEXT_PUBLIC_API_URL (http://localhost:403/api).
  */
 export function urlApi(): string {
-  const cruda = (process.env.NEXT_PUBLIC_API_URL ?? "/api").trim().replace(/\/+$/, "");
-  if (!cruda) return "/api";
-  return /\/api$/i.test(cruda) ? cruda : `${cruda}/api`;
+  if (typeof window !== "undefined" && !esDireccionLocal(window.location.hostname)) {
+    return "/api";
+  }
+  return normalizarBase(process.env.NEXT_PUBLIC_API_URL ?? "/api");
 }
 
 export function tokenSesion(): string | null {
