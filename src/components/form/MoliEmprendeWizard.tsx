@@ -19,7 +19,8 @@ import { Step2ArtesanoConNegocio } from "@/components/form/steps/Step2ArtesanoCo
 import { Step2ArtesanoTaller } from "@/components/form/steps/Step2ArtesanoTaller";
 import { Step3Commercial } from "@/components/form/steps/Step3Commercial";
 import { Step3Commitments } from "@/components/form/steps/Step3Commitments";
-import { mensajeErrorHttp } from "@/lib/api/mensaje-error";
+import { llamarApi } from "@/lib/api/cliente";
+import { aRegistroApi } from "@/lib/registrations/mapeo";
 import {
   step0Schema,
   step1Schema,
@@ -298,13 +299,13 @@ export function MoliEmprendeWizard() {
         "@/lib/registrations/serialize"
       );
       const payload = formDataToRegistration(formData);
-      const res = await fetch("/api/registrations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const resultado = await llamarApi("/registros", {
+        metodo: "POST",
+        cuerpo: aRegistroApi(payload),
+        conSesion: false,
       });
-      if (!res.ok) {
-        throw new Error(await mensajeErrorHttp(res, "Error al enviar"));
+      if (!resultado.ok) {
+        throw new Error(resultado.error || "Error al enviar");
       }
       setCurrentStep("success");
     } catch {

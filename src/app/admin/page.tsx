@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { llamarApi, tokenSesion } from "@/lib/api/cliente";
 import type { UsuarioPanel } from "@/lib/admin/types";
 
 export default function AdminPage() {
@@ -12,13 +13,16 @@ export default function AdminPage() {
   const verificarSesion = async () => {
     setVerificando(true);
     try {
-      const res = await fetch("/api/admin/me");
-      if (!res.ok) {
+      if (!tokenSesion()) {
         setUsuario(null);
         return;
       }
-      const data = (await res.json()) as { usuario: UsuarioPanel };
-      setUsuario(data.usuario);
+      const resultado = await llamarApi<{ usuario: UsuarioPanel }>("/autenticacion/perfil");
+      if (!resultado.ok || !resultado.datos) {
+        setUsuario(null);
+        return;
+      }
+      setUsuario(resultado.datos.usuario);
     } catch {
       setUsuario(null);
     } finally {

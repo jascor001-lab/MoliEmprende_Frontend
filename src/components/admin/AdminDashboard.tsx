@@ -20,6 +20,8 @@ import type { MenuPanel, UsuarioPanel } from "@/lib/admin/types";
 import { esAdministrador } from "@/lib/admin/types";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { IconoMenu } from "@/components/admin/IconoMenu";
+import { borrarToken, llamarApi } from "@/lib/api/cliente";
+import { aRegistroPanel } from "@/lib/registrations/mapeo";
 
 interface Estadisticas {
   totalEnvios: number;
@@ -51,12 +53,14 @@ export function AdminDashboard({ usuarioActual }: AdminDashboardProps) {
     setError("");
     try {
       const [resMenus, resEstadisticas, resRegistros] = await Promise.all([
-        fetch("/api/admin/menus"),
-        fetch("/api/admin/stats"),
-        fetch("/api/admin/registrations"),
+        llamarApi<{ menus: MenuPanel[] }>("/menus/mios"),
+        llamarApi<Estadisticas>("/registros/estadisticas"),
+        llamarApi<{ registros: Record<string, unknown>[] }>("/registros"),
       ]);
 
-      if ([resMenus, resEstadisticas, resRegistros].some((res) => res.status === 401)) {
+      if (
+        [resMenus, resEstadisticas, resRegistros].some((res) => res.estado === 401)
+      ) {
         window.location.reload();
         return;
       }
@@ -65,15 +69,9 @@ export function AdminDashboard({ usuarioActual }: AdminDashboardProps) {
         throw new Error("No se pudieron cargar los datos");
       }
 
-      const datosMenus = (await resMenus.json()) as { menus: MenuPanel[] };
-      const datosEstadisticas = (await resEstadisticas.json()) as Estadisticas;
-      const datosRegistros = (await resRegistros.json()) as {
-        records: RegistrationRecord[];
-      };
-
-      setMenus(datosMenus.menus);
-      setEstadisticas(datosEstadisticas);
-      setRegistros(datosRegistros.records);
+      setMenus(resMenus.datos?.menus ?? []);
+      setEstadisticas(resEstadisticas.datos);
+      setRegistros((resRegistros.datos?.registros ?? []).map(aRegistroPanel));
     } catch {
       setError("Error al cargar el panel. Intenta de nuevo.");
     } finally {
@@ -94,7 +92,7 @@ export function AdminDashboard({ usuarioActual }: AdminDashboardProps) {
   }, [menus, seccion]);
 
   const cerrarSesion = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
+    borrarToken();
     window.location.reload();
   };
 

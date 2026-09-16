@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Shield } from "lucide-react";
-import { mensajeErrorHttp } from "@/lib/api/mensaje-error";
+import { guardarToken, llamarApi } from "@/lib/api/cliente";
+import type { UsuarioPanel } from "@/lib/admin/types";
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -19,15 +20,19 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
     setCargando(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario, contrasena }),
-      });
-      if (!res.ok) {
-        setError(await mensajeErrorHttp(res, "No se pudo iniciar sesión"));
+      const resultado = await llamarApi<{ token: string; usuario: UsuarioPanel }>(
+        "/autenticacion/iniciar-sesion",
+        {
+          metodo: "POST",
+          cuerpo: { usuario, contrasena },
+          conSesion: false,
+        }
+      );
+      if (!resultado.ok || !resultado.datos?.token) {
+        setError(resultado.error || "No se pudo iniciar sesión");
         return;
       }
+      guardarToken(resultado.datos.token);
       onSuccess();
     } catch {
       setError("Error de conexión");

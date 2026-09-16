@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Pencil, ShieldPlus, UserCheck, UserX, X } from "lucide-react";
-import { mensajeErrorHttp } from "@/lib/api/mensaje-error";
+import { llamarApi } from "@/lib/api/cliente";
 import {
   ROL_ADMINISTRADOR,
   ROL_CONSULTOR,
@@ -47,21 +47,18 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
     setError("");
     try {
       const [resUsuarios, resRoles] = await Promise.all([
-        fetch("/api/admin/users"),
-        fetch("/api/admin/roles"),
+        llamarApi<{ usuarios: UsuarioPanel[] }>("/usuarios"),
+        llamarApi<{ roles: RolPanel[] }>("/roles"),
       ]);
 
-      if (resUsuarios.status === 403) {
+      if (resUsuarios.estado === 403) {
         setError("No tienes permiso para gestionar usuarios");
         return;
       }
       if (!resUsuarios.ok || !resRoles.ok) throw new Error("Error al cargar");
 
-      const datosUsuarios = (await resUsuarios.json()) as { usuarios: UsuarioPanel[] };
-      const datosRoles = (await resRoles.json()) as { roles: RolPanel[] };
-
-      setUsuarios(datosUsuarios.usuarios);
-      setRoles(datosRoles.roles);
+      setUsuarios(resUsuarios.datos?.usuarios ?? []);
+      setRoles(resRoles.datos?.roles ?? []);
     } catch {
       setError("No se pudieron cargar los usuarios");
     } finally {
@@ -100,20 +97,18 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
     setExito("");
 
     try {
-      const res = editando
-        ? await fetch("/api/admin/users", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: editando.id, ...formulario }),
+      const resultado = editando
+        ? await llamarApi(`/usuarios/${encodeURIComponent(editando.id)}`, {
+            metodo: "PATCH",
+            cuerpo: formulario,
           })
-        : await fetch("/api/admin/users", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formulario),
+        : await llamarApi("/usuarios", {
+            metodo: "POST",
+            cuerpo: formulario,
           });
 
-      if (!res.ok) {
-        setError(await mensajeErrorHttp(res, "No se pudo guardar el usuario"));
+      if (!resultado.ok) {
+        setError(resultado.error || "No se pudo guardar el usuario");
         return;
       }
 
@@ -140,13 +135,12 @@ export function UserManagement({ idUsuarioActual, permisos }: UserManagementProp
   const alternarEstado = async (destino: UsuarioPanel) => {
     setError("");
     setExito("");
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: destino.id, activo: !destino.activo }),
+    const resultado = await llamarApi(`/usuarios/${encodeURIComponent(destino.id)}`, {
+      metodo: "PATCH",
+      cuerpo: { activo: !destino.activo },
     });
-    if (!res.ok) {
-      setError(await mensajeErrorHttp(res, "No se pudo actualizar"));
+    if (!resultado.ok) {
+      setError(resultado.error || "No se pudo actualizar");
       return;
     }
     await cargar();
