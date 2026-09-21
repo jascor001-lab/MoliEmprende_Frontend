@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Shield } from "lucide-react";
 import { guardarToken, llamarApi } from "@/lib/api/cliente";
+import { EscudoMolina } from "@/components/ui/EscudoMolina";
 import type { UsuarioPanel } from "@/lib/admin/types";
 
 interface AdminLoginProps {
@@ -44,9 +44,7 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
   return (
     <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white/80 p-8 shadow-sm">
       <div className="mb-6 flex items-center gap-3">
-        <div className="rounded-xl bg-molina/10 p-3">
-          <Shield className="h-6 w-6 text-molina" />
-        </div>
+        <EscudoMolina className="h-12 w-12" />
         <div>
           <h1 className="text-xl font-bold text-molina-dark">Acceso al panel</h1>
           <p className="text-sm text-slate-600">

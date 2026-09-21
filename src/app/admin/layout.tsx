@@ -3,6 +3,11 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Admin — MoliEmprende",
   description: "Panel de administración de registros MoliEmprende",
+  icons: {
+    icon: "/escudo-la-molina.png",
+    shortcut: "/escudo-la-molina.png",
+    apple: "/escudo-la-molina.png",
+  },
 };
 
 export default function AdminLayout({

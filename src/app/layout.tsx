@@ -12,6 +12,11 @@ export const metadata: Metadata = {
   description:
     "Formulario de registro para emprendedores y artesanos del distrito de La Molina. Programa MoliEmprende de la Municipalidad de La Molina.",
   keywords: ["MoliEmprende", "La Molina", "emprendedores", "artesanos", "municipalidad"],
+  icons: {
+    icon: "/escudo-la-molina.png",
+    shortcut: "/escudo-la-molina.png",
+    apple: "/escudo-la-molina.png",
+  },
 };
 
 export default function RootLayout({

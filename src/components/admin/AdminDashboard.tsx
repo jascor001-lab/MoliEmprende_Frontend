@@ -22,6 +22,7 @@ import { UserManagement } from "@/components/admin/UserManagement";
 import { IconoMenu } from "@/components/admin/IconoMenu";
 import { borrarToken, llamarApi } from "@/lib/api/cliente";
 import { aRegistroPanel } from "@/lib/registrations/mapeo";
+import { EscudoMolina } from "@/components/ui/EscudoMolina";
 
 interface Estadisticas {
   totalEnvios: number;
@@ -114,9 +115,7 @@ export function AdminDashboard({ usuarioActual }: AdminDashboardProps) {
     <div className="flex h-full flex-col">
       <div className="border-b border-white/10 px-4 py-5">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#4ADE80] via-[#008A4B] to-[#065F46] text-[10px] font-black text-white shadow-md">
-            ME
-          </span>
+          <EscudoMolina className="h-9 w-9" />
           {!colapsada && (
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-white">MoliEmprende</p>

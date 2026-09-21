@@ -21,6 +21,7 @@ import { Step3Commercial } from "@/components/form/steps/Step3Commercial";
 import { Step3Commitments } from "@/components/form/steps/Step3Commitments";
 import { llamarApi } from "@/lib/api/cliente";
 import { aRegistroApi } from "@/lib/registrations/mapeo";
+import { EscudoMolina } from "@/components/ui/EscudoMolina";
 import {
   step0Schema,
   step1Schema,
@@ -439,12 +440,7 @@ export function MoliEmprendeWizard() {
         className="mb-4 shrink-0 text-center sm:mb-6"
       >
         <div className="mb-3 flex items-center justify-center gap-2.5">
-          <span
-            aria-hidden
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#4ADE80] via-[#008A4B] to-[#065F46] text-[11px] font-black tracking-tighter text-white shadow-[0_4px_14px_rgba(0,138,75,0.55),inset_0_1px_0_rgba(255,255,255,0.35)]"
-          >
-            ME
-          </span>
+          <EscudoMolina className="h-10 w-10" />
           <span className="text-sm font-semibold uppercase tracking-widest text-molina">
             Municipalidad de La Molina
           </span>
