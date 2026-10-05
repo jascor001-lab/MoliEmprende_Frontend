@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send, Info } from "lucide-react";
 import { ProgressBar } from "@/components/form/ProgressBar";
+import { ComunicadoFeriasModal } from "@/components/form/ComunicadoFeriasModal";
 import { NotResidentScreen } from "@/components/form/NotResidentScreen";
 import { SuccessScreen } from "@/components/form/SuccessScreen";
 import { Step0Residence } from "@/components/form/steps/Step0Residence";
@@ -128,6 +129,7 @@ function getStepLabels(
 
 export function MoliEmprendeWizard() {
   const [currentStep, setCurrentStep] = useState<WizardStep>(0);
+  const [showNoticeModal, setShowNoticeModal] = useState(true);
   const [formData, setFormData] = useState<MoliEmprendeFormData>(INITIAL_FORM_DATA);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -433,25 +435,41 @@ export function MoliEmprendeWizard() {
   const stepAnimationKey = `step-${numericStep}-${mainGroup}-${subClassification}`;
 
   return (
-    <div className="mx-auto flex h-full max-h-screen w-full max-w-3xl flex-col py-2 sm:py-4">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-4 shrink-0 text-center sm:mb-6"
-      >
-        <div className="mb-3 flex items-center justify-center gap-2.5">
-          <EscudoMolina className="h-10 w-10" />
-          <span className="text-sm font-semibold uppercase tracking-widest text-molina">
-            Municipalidad de La Molina
-          </span>
-        </div>
-        <h1 className="text-3xl font-bold text-molina-dark sm:text-4xl">
-          Moli<span className="text-molina">Emprende</span>
-        </h1>
-        <p className="mt-2 text-slate-600">
-          Registro de emprendedores y artesanos del distrito
-        </p>
-      </motion.div>
+    <>
+      <ComunicadoFeriasModal
+        isOpen={showNoticeModal}
+        onClose={() => setShowNoticeModal(false)}
+      />
+
+      <div className="mx-auto flex h-full max-h-screen w-full max-w-3xl flex-col py-2 sm:py-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 shrink-0 text-center sm:mb-6"
+        >
+          <div className="mb-3 flex items-center justify-center gap-2.5">
+            <EscudoMolina className="h-10 w-10" />
+            <span className="text-sm font-semibold uppercase tracking-widest text-molina">
+              Municipalidad de La Molina
+            </span>
+          </div>
+          <h1 className="text-3xl font-bold text-molina-dark sm:text-4xl">
+            Moli<span className="text-molina">Emprende</span>
+          </h1>
+          <p className="mt-2 text-slate-600">
+            Registro de emprendedores y artesanos del distrito
+          </p>
+          <div className="mt-2.5 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowNoticeModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-molina/30 bg-molina/10 px-3.5 py-1 text-xs font-semibold text-molina transition-all hover:bg-molina hover:text-white"
+            >
+              <Info className="h-3.5 w-3.5" />
+              Ver comunicado y requisitos de ferias
+            </button>
+          </div>
+        </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -539,5 +557,6 @@ export function MoliEmprendeWizard() {
         © {new Date().getFullYear()} Municipalidad de La Molina — MoliEmprende
       </p>
     </div>
+    </>
   );
 }
